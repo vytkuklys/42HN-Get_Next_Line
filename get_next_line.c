@@ -6,16 +6,36 @@
 /*   By: vkuklys <vkuklys@student.42.fr>            +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2021/07/28 21:22:20 by vkuklys           #+#    #+#             */
-/*   Updated: 2021/07/28 22:18:26 by vkuklys          ###   ########.fr       */
+/*   Updated: 2021/08/02 21:33:10 by vkuklys          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
-#include <stdio.h>
-#include <fcntl.h>
-#include <errno.h>
-#include <unistd.h>
-#include <stdlib.h>
 #include "get_next_line.h"
+
+char
+	*ft_substr(char const *s, size_t start, size_t len)
+{
+	size_t			i;
+	size_t			length;
+	char			*dup;
+	char			*dup_copy;
+
+	if (s == NULL)
+		return (NULL);
+	length = ft_strlen(s);
+	dup = (char *)malloc(len * sizeof(char) + 1);
+	if (dup == NULL)
+		return (NULL);
+	dup_copy = dup;
+	i = 0;
+	while (s[0] != '\0' && i < len && s[start + i] != '\0' && start < length)
+	{
+		dup_copy[i] = s[start + i];
+		i++;
+	}
+	dup_copy[i] = '\0';
+	return (dup);
+}
 
 char	*ft_strchr(const char *str, int c)
 {
@@ -30,117 +50,85 @@ char	*ft_strchr(const char *str, int c)
 	return (0);
 }
 
-void	handle_remainder_newline(char **rem, char **line)
-{
-	int		flag;
-	char	*newline;
-
-	flag = 0;
-	newline = ft_strchr(*rem, '\n');
-	if (newline)
-	{
-		if (ft_strncmp(*rem, newline, ft_strlen(*rem)) == 0)
-		{
-			*line = ft_strdup("\n");
-			flag = 1;
-		}
-		*newline = '\0';
-		newline++;
-		if (flag == 0)
-		{
-			*line = ft_strdup(*rem);
-			*line = ft_strjoin(line, "\n");
-		}
-		if (ft_strlen(newline) == 0)
-			*rem = NULL;
-		else
-			*rem = ft_strdup(newline);
-	}
-}
-
 char	*check_remainder(char **rem, char **line)
 {
 	char	*newline;
 	char	*new_rem;
+	int		len;
 
 	newline = NULL;
 	if (*rem)
 	{
 		new_rem = *rem;
 		newline = ft_strchr(*rem, '\n');
-		if (newline)
-		{
-			newline++;
-			handle_remainder_newline(rem, line);
-		}
+		len = (ft_strlen(newline) - ft_strlen(*rem)) * -1;
+		if (!newline)
+			*line = ft_substr(*rem, 0, len);
+		else if (len == ft_strlen(*rem))
+			*line = ft_strdup("\n");
 		else
-		{
-			*line = ft_strdup(*rem);
+			*line = ft_substr(*rem, 0, len + 1);
+		if (!newline || ft_strlen(newline) == 1)
 			*rem = NULL;
-		}
+		else
+			*rem = ft_substr(newline, 1, ft_strlen(newline));
 		free(new_rem);
 	}
 	else
 		*line = ft_calloc(1, 1);
-	if (newline)
-		return (newline);
-	return (NULL);
+	return (newline);
 }
 
-int	handle_buffer_newline(char *buffer, char **rem)
+char	*get_current_line(char **tmp, char **remainder)
 {
-	int		flag;
-	char	*nl;
+	char	*newline;
+	char	*line;
+	char	*tmp_r;
 
-	flag = 0;
-	nl = ft_strchr(buffer, '\n');
-	if (nl)
+	line = NULL;
+	newline = ft_strchr(*tmp, '\n');
+	if (newline)
 	{
-		*nl = '\0';
-		flag = 1;
-		nl++;
-		if (ft_strlen(nl) > 1 || (ft_strlen(nl) == 1 && *nl != '\n'))
-			*rem = ft_strdup(nl);
+		line = ft_substr(*tmp, 0, ft_strlen(*tmp) - ft_strlen(newline) + 1);
+		tmp_r = ft_strdup((*tmp) + (ft_strlen(*tmp) - ft_strlen(newline) + 1));
+		free(*tmp);
+		free(*remainder);
+		*remainder = tmp_r;
+		return (line);
 	}
-	return (flag);
+	else
+	{
+		if ((*tmp)[0] != '\0')
+			line = ft_strdup(*tmp);
+		free(*tmp);
+		free(*remainder);
+		return (line);
+	}
+	return (NULL);
 }
 
 char	*get_next_line(int fd)
 {
 	char		buffer[BUFFER_SIZE + 1];
-	static char	*rem;
-	char		*p_n;
-	int			i[2];
-	char		*line;
+	char		*tmp;
+	static char	*remainder;
+	int			bytes;
 
-	i[0] = 0;
-	i[1] = read(fd, buffer, BUFFER_SIZE);
-	if (i[1] == -1 || (i[1] == 0 && !rem) || fd < 0 || BUFFER_SIZE < 0)
-		return (NULL);
-	p_n = check_remainder(&rem, &line);
-	buffer[i[1]] = '\0';
-	if (p_n && i[1] > 0 && ft_strchr(line, '\n'))
-		rem = ft_strjoin(&rem, buffer);
-	while (i[1] > 0 && !p_n && !i[0])
+	bytes = 1;
+	check_remainder(&remainder, &tmp);
+	while (bytes > 0 && !ft_strchr(tmp, '\n'))
 	{
-		buffer[i[1]] = '\0';
-		i[0] = handle_buffer_newline(buffer, &rem);
-		line = ft_strjoin(&line, buffer);
-		if (!i[0])
-			i[1] = read(fd, buffer, BUFFER_SIZE);
+		bytes = read(fd, buffer, BUFFER_SIZE);
+		if (bytes == -1 || fd < 0 || BUFFER_SIZE < 0)
+		{
+			free(tmp);
+			tmp = NULL;
+			return (NULL);
+		}
+		buffer[bytes] = '\0';
+		tmp = ft_strjoin(&tmp, buffer);
 	}
-	if (i[0] == 1)
-		line = ft_strjoin(&line, "\n");
-	return (line);
-}
-
-
-int main(void)
-{
-	int fd = open("./foo.txt", O_RDONLY);
-	printf("%d", fd);
-	printf("%s", get_next_line(fd));
-	printf("%s", get_next_line(fd));
-	printf("%s", get_next_line(fd));
-	return 0;
+	if (remainder)
+		tmp = ft_strjoin(&tmp, remainder);
+	return (get_current_line(&tmp, &remainder));
 }
