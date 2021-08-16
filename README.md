@@ -7,5 +7,8 @@
 <br />
 :medal_sports: Targeted competences: <br />
   ~ Application of dynamic memory allocation<br />
-  ~ Management of basic gameplay elements<br />
+  ~ Dealing with memory leaks and segmentation fauls<br />
+  ~ Working with static variables <br />
 <br />
+:2nd_place_medal:Additional competences: <br />
+  ~ Debugging in Visual Studio Code
